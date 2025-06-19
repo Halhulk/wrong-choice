@@ -158,32 +158,49 @@ function endGame(){
 function endToMenu(){ clearTimeout(timer); game.style.display='none'; menu.style.display='block'; }
 
 /* ╔═  REGISTER SCORE  (POST to cloud, then refresh board)  ═════════════════════════ */
-$('registerScoreButton').onclick=async ()=>{
-  const name=$('playerNameInput').value.trim()||'Anon';
-  try{
-    await fetch(`${API_URL}?cat=${encodeURIComponent(currentCategory)}&lvl=${currentLevel}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name,score})
-    });
-  }catch(e){ console.error('API fail',e); }
+// Store submitted player name and score globally
+let playerName = '';
+let currentScore = 0;
 
-  $('registerModal').style.display='none';
-  game.style.display='none'; menu.style.display='block';
-  renderLeaderboard();             // pull fresh data
+$('registerScoreButton').onclick = async () => {
+  const name = $('playerNameInput').value.trim() || 'Anon';
+
+  // Capture player info for the leaderboard
+  playerName = name;
+  currentScore = score;
+
+  try {
+    await fetch(`${API_URL}?cat=${encodeURIComponent(currentCategory)}&lvl=${currentLevel}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, score })
+    });
+  } catch (e) {
+    console.error('API fail', e);
+  }
+
+  $('registerModal').style.display = 'none';
+  game.style.display = 'none';
+  menu.style.display = 'block';
+  renderLeaderboard();
 };
 
 function generateDummyScores() {
   const names = ["Z", "M", "A", "B", "E", "D", "A2", "K", "B2", "A3", "A4", "L", "H", "P"];
   const scores = [];
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 9; i++) {
     const name = names[Math.floor(Math.random() * names.length)];
-    const score = Math.floor(Math.random() * 1) + 9; // random 6–10
+    const score = Math.floor(Math.random() * 6) + 5; // 5–10
     scores.push({ name, score });
   }
 
-  return scores.sort((a, b) => b.score - a.score);
+  // Include current player's score in dummy leaderboard
+  if (playerName && typeof currentScore === 'number') {
+    scores.push({ name: playerName, score: currentScore });
+  }
+
+  return scores.sort((a, b) => b.score - a.score).slice(0, 10);
 }
 
 /* ╔═  GLOBAL LEADERBOARD RENDER  ═══════════════════════════════════════════════════ */
