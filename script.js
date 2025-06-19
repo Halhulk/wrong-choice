@@ -204,44 +204,51 @@ function generateDummyScores() {
 }
 
 /* ╔═  GLOBAL LEADERBOARD RENDER  ═══════════════════════════════════════════════════ */
-// 1. Helper to fetch from your real API
+// 1. Fetch helper with logging
 async function fetchLeaderboard(cat, lvl) {
+  const url = `${API_URL}?cat=${encodeURIComponent(cat)}&lvl=${encodeURIComponent(lvl)}`;
+  console.log("→ fetching leaderboard:", url);
   try {
-    const url = `${API_URL}?cat=${encodeURIComponent(cat)}&lvl=${encodeURIComponent(lvl)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();              // expect [ { name, score },… ]
-    return data.sort((a,b)=> b.score - a.score);
+    const data = await res.json();
+    console.log(`← got ${data.length} entries for`, lvl, data);
+    return data.sort((a, b) => b.score - a.score);
   } catch (e) {
-    console.warn("Leaderboard fetch failed, using dummy", e);
+    console.warn("! fetch failed for", lvl, e);
     return null;
   }
 }
 
-// 2. Tweak renderLeaderboard to pull from API per‐level
+// 2. Render per‐level, log when falling back
 async function renderLeaderboard() {
   if (!currentCategory) return;
-  const levels = ['Basic','Hard','Expert'];
+  const levels = ['Basic', 'Hard', 'Expert'];
 
   for (const lvl of levels) {
-    const box = $(`leaderboard${lvl}`);
+    const box = document.getElementById(`leaderboard${lvl}`);
     let html = '<table><thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead><tbody>';
-
-    // try real data first
+    
+    // fetch real data
     let scores = await fetchLeaderboard(currentCategory, lvl);
 
-    // fall back to dummy if API call failed or returned empty
-    if (!Array.isArray(scores) || scores.length === 0) {
-      scores = generateDummyScores();  
+    if (!scores || scores.length === 0) {
+      console.log(`Using dummy for ${lvl}`);
+      scores = generateDummyScores();
     }
-    
-    // grab top 10
-    scores.slice(0,10).forEach((r,i) => {
-      html += `<tr${r.name===playerName && r.score===currentScore? ' class="you"' : ''}>`
-           +  `<td>${i+1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;
+
+    scores.slice(0, 10).forEach((r, i) => {
+      const isYou = r.name === playerName && r.score === currentScore;
+      html += `
+        <tr${isYou ? ' class="you"' : ''}>
+          <td>${i + 1}</td>
+          <td>${r.name}</td>
+          <td>${r.score}</td>
+        </tr>`;
     });
 
-    box.querySelector('.leaderboardContent').innerHTML = html + '</tbody></table>';
+    html += '</tbody></table>';
+    box.querySelector('.leaderboardContent').innerHTML = html;
   }
 }
 
