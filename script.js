@@ -173,31 +173,32 @@ $('registerScoreButton').onclick=async ()=>{
   renderLeaderboard();             // pull fresh data
 };
 
+function generateDummyScores() {
+  const names = ["Z", "M", "A", "B", "E", "D", "A2", "K", "B2", "A3", "A4", "L", "H", "P"];
+  const scores = [];
+
+  for (let i = 0; i < 10; i++) {
+    const name = names[Math.floor(Math.random() * names.length)];
+    const score = Math.floor(Math.random() * 1) + 9; // random 6–10
+    scores.push({ name, score });
+  }
+
+  return scores.sort((a, b) => b.score - a.score);
+}
+
 /* ╔═  GLOBAL LEADERBOARD RENDER  ═══════════════════════════════════════════════════ */
-async function renderLeaderboard(){
+async function renderLeaderboard() {
   if (!currentCategory) return;
   const levels = ['Basic', 'Hard', 'Expert'];
-
-  // Dummy data
-  const dummyScores = [
-    { name: "P1", score: 9 },
-    { name: "P2", score: 8 },
-    { name: "P3", score: 7 },
-    { name: "P4", score: 6 },
-    { name: "P5", score: 5 },
-    { name: "P6", score: 6 },
-    { name: "P7", score: 4 },
-    { name: "P8", score: 3 },
-    { name: "P9", score: 2 },
-    { name: "P10", score: 1 }
-  ];
 
   for (const lvl of levels) {
     const box = $(`leaderboard${lvl}`);
     let html = '<table><thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead><tbody>';
 
+    const dummyScores = generateDummyScores();
+
     dummyScores.forEach((r, i) => {
-      html += `<tr><td>${i+1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;
+      html += `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;
     });
 
     html += '</tbody></table>';
