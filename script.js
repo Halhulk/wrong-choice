@@ -1,383 +1,377 @@
 /******************************************************************************************
- WRONG CHOICE – Main Game + Cloud/Local Persistent Leaderboard
- • Global top-10 fetched/post to API_URL
- • Falls back to localStorage per category+level
- • Falls back to dummy only if no stored data
+ WRONG CHOICE – Complete Game + Persistent Cloud/Local Leaderboard
 ******************************************************************************************/
-const API_URL = 'https://YOUR-WORKER-URL.workers.dev'; // ← change this
+const API_URL = 'https://YOUR-WORKER-URL.workers.dev'; // ← update this to your Worker URL
 
-// ╔═ GLOBAL STATE ═══════════════════════════════════════════════════════════════════════
-let questions = [], gameQuestions = [];
-let currentCategory = '', currentLevel = 'Basic';
-let currentIndex = 0, score = 0, timer = null;
-const speeds = { Basic: 7000, Hard: 5000, Expert: 3000 };
-// ╔═ MISSING GLOBALS — avoids ReferenceErrors so click-handlers attach
+// ╔═ GLOBALS ═══════════════════════════════════════════════════════════════════════════
 let combo     = 0;
 let lastWrong = 0;
 let hearts    = 3;
 let ended     = false;
 
-// ╔═ PLAYER PROFILE (localStorage) ══════════════════════════════════════════════════════
-const KEY = 'playerData',
-      defaultData = { xp: 0, level: 1, streak: 0, lastPlay: '', theme: 'light' };
-const player = { ...defaultData, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
-const today = () => new Date().toISOString().slice(0, 10);
-const savePlayer = () => localStorage.setItem(KEY, JSON.stringify(player));
+let questions       = [];
+let gameQuestions   = [];
+let currentCategory = '';
+let currentLevel    = 'Basic';
+let currentIndex    = 0;
+let score           = 0;
+let timer           = null;
 
-// ╔═ SOUND FX ═════════════════════════════════════════════════════════════════════════
-const ding = new Audio('sounds/success.mp3'),
-      buzz = new Audio('sounds/heart.mp3'),
-      chime = new Audio('sounds/level.mp3');
+let playerName   = '';
+let currentScore = 0;
 
-// ╔═ DOM SHORTCUT & ELEMENTS ════════════════════════════════════════════════════════════
+// ╔═ PLAYER PROFILE ════════════════════════════════════════════════════════════════════
+const KEY         = 'playerData';
+const defaultData = { xp:0, level:1, streak:0, lastPlay:'', theme:'light' };
+const player      = { ...defaultData, ...JSON.parse(localStorage.getItem(KEY)||'{}') };
+
+const today = ()=> new Date().toISOString().slice(0,10);
+const savePlayer = ()=> localStorage.setItem(KEY, JSON.stringify(player));
+
+// ╔═ SPEEDS PER LEVEL ═════════════════════════════════════════════════════════════════
+const speeds = { Basic:7000, Hard:5000, Expert:3000 };
+
+// ╔═ AUDIO ═════════════════════════════════════════════════════════════════════════════
+const ding  = new Audio('sounds/success.mp3');
+const buzz  = new Audio('sounds/heart.mp3');
+const chime = new Audio('sounds/level.mp3');
+
+// ╔═ DOM HELPERS & CACHING ══════════════════════════════════════════════════════════════
 const $ = id => document.getElementById(id);
-const heartsEl = $('hearts'),
-      streakBadge = $('streakBadge'),
-      menu = $('menu'),
-      game = $('game'),
-      levelName = $('levelName'),
-      scoreDisp = $('scoreDisplay'),
-      qImg = $('questionImage'),
-      qText = $('questionText'),
-      timerBar = $('timerBar'),
-      xpBar = $('xpBar'),
-      levelBadge = $('levelBadge'),
-      darkBtn = $('darkToggle');
 
-// ╔═ THEME INIT ═══════════════════════════════════════════════════════════════════════
-if (player.theme === 'dark') {
+// main UI elements
+const menu         = $('menu');
+const game         = $('game');
+const levelName    = $('levelName');
+const scoreDisp    = $('scoreDisplay');
+const heartsEl     = $('hearts');
+const xpBar        = $('xpBar');
+const levelBadge   = $('levelBadge');
+const streakBadge  = $('streakBadge');
+const darkBtn      = $('darkToggle');
+const howToPlayBtn = $('howToPlayBtn');
+const howToModal   = $('howToPlayModal');
+const closeHowTo   = $('closeHowToBtn');
+
+const qImg         = $('questionImage');
+const qText        = $('questionText');
+const timerBar     = $('timerBar');
+const yesBtn       = $('yesButton');
+const noBtn        = $('noButton');
+const backBtn      = $('backToMenu');
+const registerModal= $('registerModal');
+const registerBtn  = $('registerScoreButton');
+const nameInput    = $('playerNameInput');
+const finalScore   = $('finalScoreText');
+
+// ╔═ INIT THEME & STREAK ══════════════════════════════════════════════════════════════
+if (player.theme==='dark') {
   document.body.classList.add('dark');
-  darkBtn.textContent = '☀️';
+  darkBtn.textContent='☀️';
 }
+darkBtn.onclick = () => {
+  document.body.classList.toggle('dark');
+  const isDark = document.body.classList.contains('dark');
+  darkBtn.textContent = isDark?'☀️':'🌙';
+  player.theme = isDark?'dark':'light';
+  savePlayer();
+};
 
-// ╔═ DAILY STREAK INIT ════════════════════════════════════════════════════════════════
-if (player.lastPlay === today()) {
-  // same-day play, do nothing
-} else if (player.lastPlay &&
-           new Date(today()) - new Date(player.lastPlay) === 86400000) {
+if (player.lastPlay===today()) {
+  // same day, do nothing
+} else if (player.lastPlay && (new Date(today()) - new Date(player.lastPlay)===86400000)) {
   player.streak++;
 } else {
-  player.streak = 0;
+  player.streak=0;
 }
 player.lastPlay = today();
 streakBadge.textContent = `🔥${player.streak}`;
 savePlayer();
 
-// ╔═ LOAD QUESTIONS + IMAGES ══════════════════════════════════════════════════════════
+// ╔═ LOAD QUESTIONS + DICTIONARY ════════════════════════════════════════════════════════
 Promise.all([
-  fetch('images.json').then(r => r.json()),
-  fetch('dictionary.json').then(r => r.json())
-]).then(([imgs, dic]) => {
+  fetch('images.json').then(r=>r.json()),
+  fetch('dictionary.json').then(r=>r.json())
+]).then(([imgs, dic])=>{
   const byCat = {};
-  dic.words.forEach(({ word, category }) => {
-    (byCat[category] = byCat[category] || []).push(word);
+  dic.words.forEach(({word,category})=>{
+    (byCat[category]=byCat[category]||[]).push(word);
   });
-
-  questions = imgs.images.map(({ file, category }) => {
+  questions = imgs.images.map(({file,category})=>{
     const subj = file.split('.')[0],
           path = `images/${file}`,
-          correct = Math.random() < 0.7 ? 'yes' : 'no';
-
-    if (correct === 'yes') {
-      return { img: path, text: `Is this ${subj}?`, correct, category };
+          makeYes = Math.random()<0.7;
+    if (makeYes) {
+      return {img:path,text:`Is this ${subj}?`,correct:'yes',category};
     }
-    // pick a wrong alternative
-    const pool = (byCat[category] || [])
-      .filter(w => w.toLowerCase() !== subj.toLowerCase());
+    const pool = (byCat[category]||[]).filter(w=>w.toLowerCase()!==subj.toLowerCase());
     if (!pool.length) return null;
-    const wrong = pool[Math.floor(Math.random() * pool.length)];
-    return { img: path, text: `Is this ${wrong}?`, correct, category };
-  }).filter(Boolean).sort(() => Math.random() - 0.5);
+    const wrong = pool[Math.floor(Math.random()*pool.length)];
+    return {img:path,text:`Is this ${wrong}?`,correct:'no',category};
+  }).filter(Boolean).sort(()=>Math.random()-.5);
 
-  // now categories are clickable
-  enableLevelButtons();
+  // enable categories and levels now
+  document.querySelectorAll('.cat').forEach(b=>{
+    b.onclick = ()=> setCategory(b.dataset.cat);
+    b.classList.remove('active'); // reset
+  });
+  $('categorySelect').onchange = e=> setCategory(e.target.value);
+
+  document.querySelectorAll('.level').forEach(b=>{
+    b.disabled = false;
+    b.onclick = ()=>{
+      currentLevel = b.dataset.level;
+      startGame();
+    };
+  });
 }).catch(console.error);
 
-// ╔═ CATEGORY & LEVEL PICKERS ════════════════════════════════════════════════════════
+// ╔═ CATEGORY PICK & BOARD RENDER ════════════════════════════════════════════════════
 function setCategory(cat) {
   currentCategory = cat;
   document.querySelectorAll('.cat')
-    .forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+    .forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
   $('categorySelect').value = cat;
-  renderLeaderboard(); // refresh board on every switch
+  renderLeaderboard();
 }
-document.querySelectorAll('.cat')
-  .forEach(b => b.onclick = () => setCategory(b.dataset.cat));
-$('categorySelect').onchange = e => setCategory(e.target.value);
 
-function enableLevelButtons() {
-  document.querySelectorAll('.level')
-    .forEach(b => { b.disabled = false; });
-}
-document.querySelectorAll('.level').forEach(b => {
-  b.onclick = () => {
-    currentLevel = b.dataset.level;
-    startGame();
-  };
-});
-
-// ╔═ TOP BUTTONS ═════════════════════════════════════════════════════════════════════
-$('howToPlayBtn').onclick = () =>
-  $('howToPlayModal').style.display = 'flex';
-$('closeHowToBtn').onclick = () =>
-  $('howToPlayModal').style.display = 'none';
-darkBtn.onclick = () => {
-  document.body.classList.toggle('dark');
-  darkBtn.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
-  player.theme = document.body.classList.contains('dark') ? 'dark' : 'light';
-  savePlayer();
-};
-
-// ╔═ GAME FLOW ═══════════════════════════════════════════════════════════════════════
-function startGame() {
+// ╔═ START GAME ═══════════════════════════════════════════════════════════════════════
+function startGame(){
   if (!currentCategory) return alert('Pick a category first!');
-  gameQuestions = questions.filter(q => q.category === currentCategory);
-  if (!gameQuestions.length) return alert('Empty category.');
-  score = 0; combo = 0; hearts = 3; ended = false; currentIndex = 0;
+  gameQuestions = questions.filter(q=>q.category===currentCategory);
+  if (!gameQuestions.length)  return alert('Empty category.');
+
+  // reset state
+  combo     = 0;
+  lastWrong = 0;
+  hearts    = 3;
+  ended     = false;
+  score     = 0;
+  currentIndex=0;
   renderHearts(); renderXP();
-  menu.style.display = 'none'; game.style.display = 'block';
+
+  menu.style.display = 'none';
+  game.style.display = 'block';
   levelName.textContent = `${currentCategory} — ${currentLevel}`;
   scoreDisp.textContent = 'Score: 0';
+
+  // bind game buttons
+  yesBtn.onclick = ()=> handle('yes');
+  noBtn.onclick  = ()=> handle('no');
+  backBtn.onclick= endToMenu;
+
   nextQuestion();
 }
 
-function nextQuestion() {
+// ╔═ QUESTION LOOP ════════════════════════════════════════════════════════════════════
+function nextQuestion(){
   if (currentIndex >= gameQuestions.length) return endGame();
   const q = gameQuestions[currentIndex];
   qImg.src = q.img;
   qText.textContent = q.text;
-  timerBar.style.transition = 'none';
-  timerBar.style.width = '100%';
-  // trigger layout
+
+  timerBar.style.transition='none';
+  timerBar.style.width='100%';
   void timerBar.offsetWidth;
-  timerBar.style.transition = `width ${speeds[currentLevel]}ms linear`;
-  timerBar.style.width = '0%';
+  timerBar.style.transition=`width ${speeds[currentLevel]}ms linear`;
+  timerBar.style.width='0%';
+
   clearTimeout(timer);
-  timer = setTimeout(() => { alert('Time up!'); endGame(); }, speeds[currentLevel]);
+  timer = setTimeout(()=>{ alert('Time up!'); endGame(); }, speeds[currentLevel]);
 }
 
-$('yesButton').onclick = () => handle('yes');
-$('noButton').onclick = () => handle('no');
-$('backToMenu').onclick = endToMenu;
-
-function handle(ans) {
+function handle(ans){
   if (ended) return;
   clearTimeout(timer);
   const q = gameQuestions[currentIndex];
-  if (ans === q.correct) {
-    // WRONG CHOICE mechanic – lose heart
-    hearts--; renderHearts(); combo = 0; buzz.play();
+  if (ans===q.correct){
+    // wrong choice → lose heart
+    hearts--; renderHearts(); combo=0; buzz.play();
     game.classList.add('shake');
-    setTimeout(() => game.classList.remove('shake'), 400);
-    if (hearts === 0) return endGame();
+    setTimeout(()=>game.classList.remove('shake'),400);
+    if (hearts===0) return endGame();
   } else {
-    // correct “wrong” answer
+    // correct “wrong” → earn combo points
     const now = Date.now();
-    combo = now - lastWrong < 800 ? combo + 1 : 1;
+    combo = (now - lastWrong<800)? combo+1 : 1;
     lastWrong = now;
-    const mult = Math.min(combo, 5);
-    score += mult;
-    scoreDisp.textContent = `Score: ${score}`;
-    addXP(mult); ding.play(); showCombo(mult);
-    if (mult === 5) sparkles();
+    const m = Math.min(combo,5);
+    score+=m;
+    scoreDisp.textContent=`Score: ${score}`;
+    addXP(m); ding.play(); showCombo(m);
+    if (m===5) sparkles();
   }
   currentIndex++;
   nextQuestion();
 }
 
-// ╔═ HEARTS / XP / LEVEL ════════════════════════════════════════════════════════════
-function renderHearts() {
-  heartsEl.textContent = '❤️'.repeat(hearts) + '🤍'.repeat(3 - hearts);
+// ╔═ HEARTS / XP / LEVEL UI ══════════════════════════════════════════════════════════
+function renderHearts(){
+  heartsEl.textContent = '❤️'.repeat(hearts)+'🤍'.repeat(3-hearts);
 }
-
-function addXP(x) {
-  player.xp += x;
-  let up = false;
-  while (player.xp >= player.level * 25) {
-    player.level++; up = true;
+function addXP(x){
+  player.xp+=x;
+  let up=false;
+  while (player.xp >= player.level*25){
+    player.level++; up=true;
   }
-  if (up) {
+  if (up){
     confetti(); chime.play();
     alert(`Level Up! Lv ${player.level}`);
   }
   savePlayer(); renderXP();
 }
-
-function renderXP() {
-  levelBadge.textContent = `Lv ${player.level}`;
-  xpBar.style.width = `${((player.xp % 25) / 25) * 100}%`;
+function renderXP(){
+  levelBadge.textContent=`Lv ${player.level}`;
+  xpBar.style.width = `${((player.xp%25)/25)*100}%`;
 }
 
-// ╔═ END GAME + SHOW REGISTER MODAL ════════════════════════════════════════════════
-function endGame() {
+// ╔═ END GAME & SHOW REGISTER MODAL ══════════════════════════════════════════════════
+function endGame(){
   if (ended) return;
   ended = true;
   clearTimeout(timer);
   player.lastPlay = today(); player.streak++; savePlayer();
   streakBadge.textContent = `🔥${player.streak}`;
-  $('finalScoreText').textContent = `Your final score: ${score}`;
-  $('registerModal').style.display = 'flex';
+  finalScore.textContent = `Your final score: ${score}`;
+  registerModal.style.display = 'flex';
 }
-
-function endToMenu() {
+function endToMenu(){
   clearTimeout(timer);
   game.style.display = 'none';
   menu.style.display = 'block';
 }
 
 // ╔═ LOCALSTORAGE HELPERS FOR LEADERBOARD ═══════════════════════════════════════════
-function storageKey(cat, lvl) {
-  return `leaderboard:${cat}:${lvl}`;
+function storageKey(cat,lvl){ return `lb:${cat}:${lvl}`; }
+function readStored(cat,lvl){
+  try{ return JSON.parse(localStorage.getItem(storageKey(cat,lvl)))||[]; }
+  catch{return [];}
 }
-function readStored(cat, lvl) {
-  try {
-    return JSON.parse(localStorage.getItem(storageKey(cat, lvl))) || [];
-  } catch {
-    return [];
-  }
-}
-function writeStored(cat, lvl, arr) {
-  localStorage.setItem(storageKey(cat, lvl), JSON.stringify(arr.slice(0, 10)));
+function writeStored(cat,lvl,arr){
+  localStorage.setItem(storageKey(cat,lvl), JSON.stringify(arr.slice(0,10)));
 }
 
-// ╔═ DUMMY SCORES (first-time users) ════════════════════════════════════════════════
-function generateDummyScores() {
+// ╔═ DUMMY DATA ══════════════════════════════════════════════════════════════════════
+function generateDummyScores(){
   const names = ["Z","M","A","B","E","D","A2","K","B2","A3","A4","L","H","P"];
-  const list = [];
-  for (let i = 0; i < 9; i++) {
-    const name = names[Math.floor(Math.random() * names.length)];
-    const s = Math.floor(Math.random() * 6) + 5; // 5–10
-    list.push({ name, score: s });
+  const out = [];
+  for(let i=0;i<9;i++){
+    out.push({name: names[Math.floor(Math.random()*names.length)],
+              score: Math.floor(Math.random()*6)+5});
   }
-  if (playerName && typeof currentScore === 'number') {
-    list.push({ name: playerName, score: currentScore });
+  if (playerName && typeof currentScore==='number'){
+    out.push({name:playerName,score:currentScore});
   }
-  return list.sort((a, b) => b.score - a.score).slice(0, 10);
+  return out.sort((a,b)=>b.score-b.score).slice(0,10);
 }
 
-// ╔═ CLOUD FETCH + LOGGING ════════════════════════════════════════════════════════
-async function fetchLeaderboard(cat, lvl) {
+// ╔═ CLOUD FETCH + FALLBACK RENDER ════════════════════════════════════════════════════
+async function fetchLeaderboard(cat,lvl){
   const url = `${API_URL}?cat=${encodeURIComponent(cat)}&lvl=${encodeURIComponent(lvl)}`;
-  console.log('→ fetching leaderboard:', url);
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    console.log(`← got ${data.length} entries for`, lvl, data);
-    return data.sort((a,b)=> b.score - a.score);
-  } catch (e) {
-    console.warn(`API fetch failed for ${lvl}`, e);
+  console.log('→ fetching leaderboard',url);
+  try{
+    const r = await fetch(url);
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    console.log(`← got ${d.length} for ${lvl}`,d);
+    return d.sort((a,b)=>b.score-a.score);
+  } catch(e){
+    console.warn('API failed',lvl,e);
     return null;
   }
 }
 
-// ╔═ RENDER GLOBAL + LOCALSTORAGE LEADERBOARD ════════════════════════════════════════
-async function renderLeaderboard() {
-  if (!currentCategory) return;
-  const levels = ['Basic','Hard','Expert'];
-  for (const lvl of levels) {
-    const box = $(`leaderboard${lvl}`);
-    let scores = await fetchLeaderboard(currentCategory, lvl);
-    if (!Array.isArray(scores) || !scores.length) {
-      scores = readStored(currentCategory, lvl);
+async function renderLeaderboard(){
+  if(!currentCategory) return;
+  const lvls = ['Basic','Hard','Expert'];
+  lvls.forEach(async lvl=>{
+    let scores = await fetchLeaderboard(currentCategory,lvl);
+    if(!Array.isArray(scores)||!scores.length){
+      scores = readStored(currentCategory,lvl);
     }
-    if (!scores.length) {
+    if(!scores.length){
       scores = generateDummyScores();
     }
-    writeStored(currentCategory, lvl, scores);
-    const rows = scores.slice(0,10).map((r,i) => {
-      const isYou = r.name === playerName && r.score === currentScore;
-      return `<tr${isYou?' class="you"':''}>
-                <td>${i+1}</td><td>${r.name}</td><td>${r.score}</td>
-              </tr>`;
+    writeStored(currentCategory,lvl,scores);
+
+    const rows = scores.slice(0,10).map((r,i)=>{
+      const you = (r.name===playerName && r.score===currentScore)? ' class="you"' : '';
+      return `<tr${you}><td>${i+1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;
     }).join('');
+
+    const box = $(`leaderboard${lvl}`);
     box.querySelector('.leaderboardContent').innerHTML = `
       <table>
         <thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
-  }
+  });
 }
 
-// ╔═ REGISTER SCORE BUTTON ════════════════════════════════════════════════════════
-let playerName = '', currentScore = 0;
-$('registerScoreButton').onclick = async () => {
-  const name = $('playerNameInput').value.trim() || 'Anon';
+// ╔═ REGISTER SCORE BUTTON ════════════════════════════════════════════════════════════
+registerBtn.onclick = async ()=>{
+  const name = nameInput.value.trim()||'Anon';
   playerName   = name;
   currentScore = score;
 
-  // 1) persist locally
-  const stored = readStored(currentCategory, currentLevel);
-  stored.push({ name, score: currentScore });
-  writeStored(currentCategory, currentLevel, stored);
+  // persist local
+  const stored = readStored(currentCategory,currentLevel);
+  stored.push({name,score:currentScore});
+  writeStored(currentCategory,currentLevel,stored);
 
-  // 2) post to cloud
-  try {
+  // post to cloud
+  try{
     await fetch(
-      `${API_URL}?cat=${encodeURIComponent(currentCategory)}&lvl=${currentLevel}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, score: currentScore })
-      }
-    );
-  } catch (e) {
-    console.error('API post failed', e);
-  }
+      `${API_URL}?cat=${encodeURIComponent(currentCategory)}&lvl=${currentLevel}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({name,score:currentScore})});
+  }catch(e){ console.error('post fail',e); }
 
-  // 3) close modal & back to menu
-  $('registerModal').style.display = 'none';
-  game.style.display = 'none';
-  menu.style.display = 'block';
-
-  // 4) refresh boards
+  registerModal.style.display='none';
+  game.style.display='none';
+  menu.style.display='block';
   renderLeaderboard();
 };
 
-// ╔═ COMBO POP / SPARKLES / CONFETTI ════════════════════════════════════════════════
-function showCombo(m) {
-  if (m < 2) return;
+// ╔═ COMBO / SPARKLE / CONFETTI FUN ═══════════════════════════════════════════════════
+function showCombo(m){
+  if(m<2) return;
   const d = document.createElement('div');
-  d.className = 'comboPop'; d.textContent = `×${m}`;
+  d.className='comboPop'; d.textContent=`×${m}`;
   document.body.appendChild(d);
-  setTimeout(() => d.remove(), 600);
+  setTimeout(()=>d.remove(),600);
 }
-
-function sparkles() {
-  for (let i = 0; i < 15; i++) {
-    const s = document.createElement('div');
-    s.className = 'sparkle';
-    const ang = Math.random() * Math.PI * 2, dist = 60 + Math.random() * 40;
-    s.style.setProperty('--dx', `${Math.cos(ang)*dist}px`);
-    s.style.setProperty('--dy', `${Math.sin(ang)*dist}px`);
+function sparkles(){
+  for(let i=0;i<15;i++){
+    const s=document.createElement('div'); s.className='sparkle';
+    const ang=Math.random()*Math.PI*2, dist=60+Math.random()*40;
+    s.style.setProperty('--dx',`${Math.cos(ang)*dist}px`);
+    s.style.setProperty('--dy',`${Math.sin(ang)*dist}px`);
     document.body.appendChild(s);
-    setTimeout(() => s.remove(), 700);
+    setTimeout(()=>s.remove(),700);
   }
 }
-
-function confetti() {
-  const colors = ['#ff5b5b','#ffba5a','#4ecdc4','#ffd166'];
-  for (let i = 0; i < 25; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.setProperty('--dx', `${(Math.random()-0.5)*300}px`);
-    c.style.setProperty('--dy', `${-Math.random()*300}px`);
-    c.style.setProperty('--c', colors[i % colors.length]);
-    document.body.appendChild(c);
-    setTimeout(() => c.remove(), 800);
-  }
+function confetti(){
+  ['#ff5b5b','#ffba5a','#4ecdc4','#ffd166'].forEach((c,i)=>{
+    const el = document.createElement('div');
+    el.className='confetti';
+    el.style.setProperty('--dx',`${(Math.random()-0.5)*300}px`);
+    el.style.setProperty('--dy',`${-Math.random()*300}px`);
+    el.style.setProperty('--c',c);
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),800);
+  });
 }
 
-// ╔═ SOCIAL SHARE ════════════════════════════════════════════════════════════════════
-$('shareXButton').onclick = () =>
-  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent('I scored '+score+' in Wrong Choice!')}`);
-$('shareFacebookButton').onclick = () =>
-  window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(location.href)}`);
-$('shareScore').onclick = () => {
-  if (navigator.share) {
-    navigator.share({ title: 'Wrong Choice', text: `I scored ${score}!` });
-  } else {
-    alert('Native share not supported.');
-  }
+// ╔═ SOCIAL SHARE BUTTONS ════════════════════════════════════════════════════════════
+$('shareXButton').onclick = ()=> window.open(
+  `https://twitter.com/intent/tweet?text=${encodeURIComponent('I scored '+score+' in Wrong Choice!')}`);
+$('shareFacebookButton').onclick = ()=> window.open(
+  `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(location.href)}`);
+$('shareScore').onclick = ()=> {
+  if(navigator.share) navigator.share({title:'Wrong Choice',text:`I scored ${score}!`});
+  else alert('Native share not supported.');
 };
 
 // ╔═ INITIALIZE UI ═══════════════════════════════════════════════════════════════════
