@@ -11,6 +11,11 @@ let questions = [], gameQuestions = [];
 let currentCategory = '', currentLevel = 'Basic';
 let currentIndex = 0, score = 0, timer = null;
 const speeds = { Basic: 7000, Hard: 5000, Expert: 3000 };
+// ╔═ MISSING GLOBALS — avoids ReferenceErrors so click-handlers attach
+let combo     = 0;
+let lastWrong = 0;
+let hearts    = 3;
+let ended     = false;
 
 // ╔═ PLAYER PROFILE (localStorage) ══════════════════════════════════════════════════════
 const KEY = 'playerData',
