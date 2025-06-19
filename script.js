@@ -156,8 +156,13 @@ function startGame(){
   scoreDisp.textContent = 'Score: 0';
 
   // bind game buttons
-  yesBtn.onclick = ()=> handle('yes');
-  noBtn.onclick  = ()=> handle('no');
+  yesBtn.onclick = () => {
+  if (!ended && game.style.display==='block') handle('yes');
+  };
+  noBtn.onclick = () => {
+  if (!ended && game.style.display==='block') handle('no');
+  };
+
   backBtn.onclick= endToMenu;
 
   nextQuestion();
@@ -177,9 +182,12 @@ function nextQuestion(){
   timerBar.style.width='0%';
 
   clearTimeout(timer);
-  timer = setTimeout(()=>{ alert('Time up!'); endGame(); }, speeds[currentLevel]);
+   timer = setTimeout(()=>{
+   console.log('⌛ Time up!');
+   ended = true;               // prevent any further answers
+   endGame();
+ }, speeds[currentLevel]);
 }
-
 function handle(ans){
   if (ended) return;
   clearTimeout(timer);
