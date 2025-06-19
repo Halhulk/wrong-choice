@@ -204,22 +204,44 @@ function generateDummyScores() {
 }
 
 /* ╔═  GLOBAL LEADERBOARD RENDER  ═══════════════════════════════════════════════════ */
+// 1. Helper to fetch from your real API
+async function fetchLeaderboard(cat, lvl) {
+  try {
+    const url = `${API_URL}?cat=${encodeURIComponent(cat)}&lvl=${encodeURIComponent(lvl)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();              // expect [ { name, score },… ]
+    return data.sort((a,b)=> b.score - a.score);
+  } catch (e) {
+    console.warn("Leaderboard fetch failed, using dummy", e);
+    return null;
+  }
+}
+
+// 2. Tweak renderLeaderboard to pull from API per‐level
 async function renderLeaderboard() {
   if (!currentCategory) return;
-  const levels = ['Basic', 'Hard', 'Expert'];
+  const levels = ['Basic','Hard','Expert'];
 
   for (const lvl of levels) {
     const box = $(`leaderboard${lvl}`);
     let html = '<table><thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead><tbody>';
 
-    const dummyScores = generateDummyScores();
+    // try real data first
+    let scores = await fetchLeaderboard(currentCategory, lvl);
 
-    dummyScores.forEach((r, i) => {
-      html += `<tr><td>${i + 1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;
+    // fall back to dummy if API call failed or returned empty
+    if (!Array.isArray(scores) || scores.length === 0) {
+      scores = generateDummyScores();  
+    }
+    
+    // grab top 10
+    scores.slice(0,10).forEach((r,i) => {
+      html += `<tr${r.name===playerName && r.score===currentScore? ' class="you"' : ''}>`
+           +  `<td>${i+1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;
     });
 
-    html += '</tbody></table>';
-    box.querySelector('.leaderboardContent').innerHTML = html;
+    box.querySelector('.leaderboardContent').innerHTML = html + '</tbody></table>';
   }
 }
 
