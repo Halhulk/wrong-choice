@@ -175,23 +175,33 @@ $('registerScoreButton').onclick=async ()=>{
 
 /* ╔═  GLOBAL LEADERBOARD RENDER  ═══════════════════════════════════════════════════ */
 async function renderLeaderboard(){
-  if(!currentCategory) return;
-  const levels=['Basic','Hard','Expert'];
-  for(const lvl of levels){
-    const box=$(`leaderboard${lvl}`);
-    box.querySelector('.leaderboardContent').innerHTML='Loading…';
-    try{
-      const rows=await fetch(`${API_URL}?cat=${encodeURIComponent(currentCategory)}&lvl=${lvl}&date=${today()}`)
-                       .then(r=>r.json());
-      let html='<table><thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead><tbody>';
-      if(!rows.length) html+='<tr><td colspan="3">No scores yet today.</td></tr>';
-      else rows.forEach((r,i)=>{ html+=`<tr><td>${i+1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;});
-      html+='</tbody></table>';
-      box.querySelector('.leaderboardContent').innerHTML=html;
-    }catch(e){
-      box.querySelector('.leaderboardContent').innerHTML='<small>offline</small>';
-      console.error(e);
-    }
+  if (!currentCategory) return;
+  const levels = ['Basic', 'Hard', 'Expert'];
+
+  // Dummy data
+  const dummyScores = [
+    { name: "P1", score: 9 },
+    { name: "P2", score: 8 },
+    { name: "P3", score: 7 },
+    { name: "P4", score: 6 },
+    { name: "P5", score: 5 },
+    { name: "P6", score: 6 },
+    { name: "P7", score: 4 },
+    { name: "P8", score: 3 },
+    { name: "P9", score: 2 },
+    { name: "P10", score: 1 }
+  ];
+
+  for (const lvl of levels) {
+    const box = $(`leaderboard${lvl}`);
+    let html = '<table><thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead><tbody>';
+
+    dummyScores.forEach((r, i) => {
+      html += `<tr><td>${i+1}</td><td>${r.name}</td><td>${r.score}</td></tr>`;
+    });
+
+    html += '</tbody></table>';
+    box.querySelector('.leaderboardContent').innerHTML = html;
   }
 }
 
