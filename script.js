@@ -157,100 +157,141 @@ function endGame(){
 
 function endToMenu(){ clearTimeout(timer); game.style.display='none'; menu.style.display='block'; }
 
-/* ╔═  REGISTER SCORE  (POST to cloud, then refresh board)  ═════════════════════════ */
-// Store submitted player name and score globally
+// ╔═ GLOBAL STATE ════════════════════════════════════════════════════════
 let playerName = '';
 let currentScore = 0;
+let currentCategory = '';  // ← set this when the player picks a category
+let currentLevel = '';     // ← set this when the player picks a level
+const $ = id => document.getElementById(id);
 
-$('registerScoreButton').onclick = async () => {
-  const name = $('playerNameInput').value.trim() || 'Anon';
-
-  // Capture player info for the leaderboard
-  playerName = name;
-  currentScore = score;
-
-  try {
-    await fetch(`${API_URL}?cat=${encodeURIComponent(currentCategory)}&lvl=${currentLevel}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, score })
-    });
-  } catch (e) {
-    console.error('API fail', e);
-  }
-
-  $('registerModal').style.display = 'none';
-  game.style.display = 'none';
-  menu.style.display = 'block';
-  renderLeaderboard();
-};
-
-function generateDummyScores() {
-  const names = ["Z", "M", "A", "B", "E", "D", "A2", "K", "B2", "A3", "A4", "L", "H", "P"];
-  const scores = [];
-
-  for (let i = 0; i < 9; i++) {
-    const name = names[Math.floor(Math.random() * names.length)];
-    const score = Math.floor(Math.random() * 6) + 5; // 5–10
-    scores.push({ name, score });
-  }
-
-  // Include current player's score in dummy leaderboard
-  if (playerName && typeof currentScore === 'number') {
-    scores.push({ name: playerName, score: currentScore });
-  }
-
-  return scores.sort((a, b) => b.score - a.score).slice(0, 10);
+// ╔═ LOCAL STORAGE HELPERS ══════════════════════════════════════════════
+function storageKey(cat, lvl) {
+  return `leaderboard:${cat}:${lvl}`;
 }
 
-/* ╔═  GLOBAL LEADERBOARD RENDER  ═══════════════════════════════════════════════════ */
-// 1. Fetch helper with logging
+function readStored(cat, lvl) {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey(cat, lvl))) || [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStored(cat, lvl, arr) {
+  localStorage.setItem(storageKey(cat, lvl), JSON.stringify(arr.slice(0, 10)));
+}
+
+// ╔═ API FETCH ══════════════════════════════════════════════════════════
 async function fetchLeaderboard(cat, lvl) {
   const url = `${API_URL}?cat=${encodeURIComponent(cat)}&lvl=${encodeURIComponent(lvl)}`;
-  console.log("→ fetching leaderboard:", url);
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    console.log(`← got ${data.length} entries for`, lvl, data);
+    const data = await res.json();               // Expect [{ name, score }, …]
     return data.sort((a, b) => b.score - a.score);
   } catch (e) {
-    console.warn("! fetch failed for", lvl, e);
+    console.warn(`API fetch failed for ${lvl}`, e);
     return null;
   }
 }
 
-// 2. Render per‐level, log when falling back
+// ╔═ DUMMY SCORES (for brand-new players) ════════════════════════════════
+function generateDummyScores() {
+  const names = ["Z","M","A","B","E","D","A2","K","B2","A3","A4","L","H","P"];
+  const scores = [];
+
+  for (let i = 0; i < 9; i++) {
+    const name  = names[Math.floor(Math.random() * names.length)];
+    const score = Math.floor(Math.random() * 6) + 5;  // 5–10
+    scores.push({ name, score });
+  }
+
+  // Include the real player if we have one
+  if (playerName && typeof currentScore === "number") {
+    scores.push({ name: playerName, score: currentScore });
+  }
+
+  return scores
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+}
+
+// ╔═ RENDER LEADERBOARDS ════════════════════════════════════════════════
 async function renderLeaderboard() {
   if (!currentCategory) return;
   const levels = ['Basic', 'Hard', 'Expert'];
 
   for (const lvl of levels) {
-    const box = document.getElementById(`leaderboard${lvl}`);
-    let html = '<table><thead><tr><th>#</th><th>Name</th><th>Score</th></tr></thead><tbody>';
-    
-    // fetch real data
+    const box = $(`leaderboard${lvl}`);
+    // 1) try real API
     let scores = await fetchLeaderboard(currentCategory, lvl);
 
-    if (!scores || scores.length === 0) {
-      console.log(`Using dummy for ${lvl}`);
+    // 2) fallback to localStorage
+    if (!Array.isArray(scores) || scores.length === 0) {
+      scores = readStored(currentCategory, lvl);
+    }
+
+    // 3) fallback to dummy
+    if (!scores.length) {
       scores = generateDummyScores();
     }
 
-    scores.slice(0, 10).forEach((r, i) => {
-      const isYou = r.name === playerName && r.score === currentScore;
-      html += `
-        <tr${isYou ? ' class="you"' : ''}>
-          <td>${i + 1}</td>
-          <td>${r.name}</td>
-          <td>${r.score}</td>
-        </tr>`;
-    });
+    // 4) persist the result
+    writeStored(currentCategory, lvl, scores);
 
-    html += '</tbody></table>';
-    box.querySelector('.leaderboardContent').innerHTML = html;
+    // 5) build HTML
+    const rows = scores.slice(0, 10).map((r, i) => {
+      const isYou = (r.name === playerName && r.score === currentScore);
+      return `<tr${isYou ? ' class="you"' : ''}>
+                <td>${i + 1}</td>
+                <td>${r.name}</td>
+                <td>${r.score}</td>
+              </tr>`;
+    }).join('');
+
+    box.querySelector('.leaderboardContent').innerHTML = `
+      <table>
+        <thead>
+          <tr><th>#</th><th>Name</th><th>Score</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
   }
 }
+
+// ╔═ REGISTER SCORE HANDLER ══════════════════════════════════════════════
+$('registerScoreButton').onclick = async () => {
+  const name = $('playerNameInput').value.trim() || 'Anon';
+  playerName   = name;
+  currentScore = score;   // ← assumes `score` is set from your game logic
+
+  // 1) persist locally immediately
+  const stored = readStored(currentCategory, currentLevel);
+  stored.push({ name, score: currentScore });
+  writeStored(currentCategory, currentLevel, stored);
+
+  // 2) then POST to your API
+  try {
+    await fetch(
+      `${API_URL}?cat=${encodeURIComponent(currentCategory)}&lvl=${encodeURIComponent(currentLevel)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, score: currentScore })
+      }
+    );
+  } catch (e) {
+    console.warn('API post failed', e);
+  }
+
+  // 3) close modal & show menu
+  $('registerModal').style.display = 'none';
+  game.style.display = 'none';
+  menu.style.display = 'block';
+
+  // 4) re-render with updated data
+  renderLeaderboard();
+};
 
 /* ╔═  COMBO POP / SPARKLE / CONFETTI  ═════════════════════════════════════════════ */
 function showCombo(m){
