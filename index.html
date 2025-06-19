@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#00c2ff" />
+  <meta charset="UTF-8" />
+  <title>Wrong Choice – Global Daily Leaderboard</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(() => console.log('✅ Service worker registered'))
+      .catch(err => console.error('❌ SW error', err));
+  }
+</script>
+<body>
+  <!-- fixed-position top-right / top-left icon buttons -->
+  <button id="darkToggle"   aria-label="Dark / Light">🌙</button>
+  <button id="howToPlayBtn" aria-label="How to play">❓</button>
+
+  <!-- ╔═════════════════  MENU CARD  ══════════════════╗ -->
+  <div id="menu">
+    <h1 id="logo">
+      <span class="wrong">Wrong</span> <span class="choice">Choice</span>
+    </h1>
+
+    <h2>Pick a Category</h2>
+    <div id="categories" class="cat-grid">
+      <button class="cat" data-cat="Animals">🐾<span>Animals</span></button>
+      <button class="cat" data-cat="Instruments">🎻<span>Instruments</span></button>
+      <button class="cat" data-cat="Food & Drinks">🍕<span>Food&nbsp;&amp;&nbsp;Drinks</span></button>
+      <button class="cat" data-cat="Vehicles">🚗<span>Vehicles</span></button>
+      <button class="cat" data-cat="Nature & Plants">🌳<span>Nature&nbsp;&amp;&nbsp;Plants</span></button>
+      <button class="cat" data-cat="Buildings & Landmarks">🏰<span>Landmarks</span></button>
+      <button class="cat" data-cat="Sports">🏀<span>Sports</span></button>
+      <button class="cat" data-cat="Technology">💻<span>Technology</span></button>
+      <button class="cat" data-cat="Everyday Objects">🧩<span>Everyday&nbsp;Objects</span></button>
+      <button class="cat" data-cat="Art & Culture">🎨<span>Art&nbsp;&amp;&nbsp;Culture</span></button>
+    </div>
+
+    <!-- hidden select for keyboard / screen-readers -->
+    <select id="categorySelect" style="position:absolute;left:-9999px;">
+      <option value="Animals">Animals</option><option value="Instruments">Instruments</option>
+      <option value="Food & Drinks">Food & Drinks</option><option value="Vehicles">Vehicles</option>
+      <option value="Nature & Plants">Nature & Plants</option><option value="Buildings & Landmarks">Buildings & Landmarks</option>
+      <option value="Sports">Sports</option><option value="Technology">Technology</option>
+      <option value="Everyday Objects">Everyday Objects</option><option value="Art & Culture">Art & Culture</option>
+    </select>
+
+    <h2>Select Level</h2>
+    <button class="level" data-level="Basic"  disabled>Basic</button>
+    <button class="level" data-level="Hard"   disabled>Hard</button>
+    <button class="level" data-level="Expert" disabled>Expert</button>
+
+    <!-- leaderboards per difficulty -->
+    <div id="leaderboards">
+      <div class="lb-card" id="leaderboardBasic">
+        <h3>Basic</h3><div class="leaderboardContent lb-inner">No scores yet.</div>
+      </div>
+      <div class="lb-card" id="leaderboardHard">
+        <h3>Hard</h3><div class="leaderboardContent lb-inner">No scores yet.</div>
+      </div>
+      <div class="lb-card" id="leaderboardExpert">
+        <h3>Expert</h3><div class="leaderboardContent lb-inner">No scores yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ╔═════════════════  GAME CARD  ══════════════════╗ -->
+  <div id="game" style="display:none;">
+    <button id="backToMenu">← Menu</button>
+
+    <div id="playerStats">
+      <div id="levelBadge">Lv&nbsp;1</div>
+      <div id="xpBarContainer"><div id="xpBar"></div></div>
+
+      <!-- 🔥 daily streak badge (needed by script.js) -->
+      <div id="streakBadge" title="Daily streak">🔥0</div>
+
+      <div id="hearts">❤️❤️❤️</div>
+    </div>
+
+    <h2 id="levelName"></h2>
+    <p  id="scoreDisplay">Score: 0</p>
+
+    <div id="questionArea">
+      <img id="questionImage" src="" alt="Question" loading="lazy" />
+      <h3 id="questionText"></h3>
+
+      <div id="timerBarContainer"><div id="timerBar"></div></div>
+
+      <div id="buttons">
+        <button id="yesButton">Yes</button>
+        <button id="noButton">No</button>
+      </div>
+    </div>
+
+    <button id="shareScore">Native Share</button>
+  </div>
+
+  <!-- ╔═════════════════  GAME-OVER / REGISTER MODAL  ══════════════════╗ -->
+  <div id="registerModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h2>Game Over!</h2>
+      <p id="finalScoreText"></p>
+
+      <input type="text" id="playerNameInput" placeholder="Enter your name" />
+      <button id="registerScoreButton">Register Score</button>
+
+      <div class="share-buttons">
+        <button id="shareXButton">Share on X</button>
+        <button id="shareFacebookButton">Share on Facebook</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ╔═════════════════  HOW-TO-PLAY MODAL  ══════════════════╗ -->
+  <div id="howToPlayModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h2>How to Play</h2>
+      <ol class="howto">
+        <li>Select a category tile.</li>
+        <li>Select a difficulty (Basic 7 s, Hard 5 s, Expert 3 s).</li>
+        <li>Look at the image. Tap <b>Yes</b> if the text matches, <b>No</b> if not.</li>
+        <li>The turquoise bar shows remaining time.</li>
+        <li>Wrong answers = points. Correct answers or timeout cost a ❤️.</li>
+        <li>Daily streak 🔥 grows when you finish at least one run each day.</li>
+        <li>Register, share and try to top today’s global leaderboard!</li>
+      </ol>
+      <button id="closeHowToBtn">Got it!</button>
+    </div>
+  </div>
+
+  <footer>
+    © 2025 Wrong Choice · Leaderboard resets at midnight UTC
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
