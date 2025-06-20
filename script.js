@@ -4,7 +4,14 @@
   • Only today’s scores are shown (auto-reset at midnight UTC)
 ******************************************************************************************/
 
-const API_URL = 'https://YOUR-WORKER-URL.workers.dev';   //  ←  CHANGE THIS
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register(
+    '/wrong-choice/sw.js',
+    { scope: '/wrong-choice/' }
+  )
+  .then(() => console.log('✅ Service worker registered'))
+  .catch(err => console.error('❌ SW error', err));
+}
 
 /* ╔═  GLOBAL STATE  ═══════════════════════════════════════════════════════════════════ */
 let questions=[], gameQuestions=[];
