@@ -1,46 +1,25 @@
 {
   "name": "Wrong Choice",
   "short_name": "WrongChoice",
-  "id": "/wrong-choice/",
-  "start_url": "/wrong-choice/",
+  "start_url": "/wrong-choice/?utm_source=homescreen",
   "scope": "/wrong-choice/",
   "display": "standalone",
   "orientation": "portrait",
   "description": "A fast-paced guessing game powered by wrong choices!",
   "background_color": "#ffffff",
   "theme_color": "#000000",
-  "launch_handler": {
-    "client_mode": "auto"
-  },
-  "prefer_related_applications": false,
-  "related_applications": [],
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "/wrong-choice/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "/wrong-choice/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "icons/screenshot1.png",
-      "sizes": "720x1280",
-      "type": "image/png"
-    },
-    {
-      "src": "icons/screenshot2.png",
-      "sizes": "720x1280",
-      "type": "image/png"
-    },
-    {
-      "src": "icons/screenshot3.png",
-      "sizes": "720x1280",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "maskable any"
     }
   ]
 }
