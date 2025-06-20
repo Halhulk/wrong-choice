@@ -1,55 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Wrong Choice</title>
-  <meta name="description" content="A fast-paced guessing game powered by wrong choices!">
+  <meta name="description" content="A fast-paced guessing game powered by wrong choices!" />
+
   <!-- PWA manifest (optional) -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#000000">
-  <!-- Your main stylesheet -->
-  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <!-- ─── MAIN MENU ─────────────────────────────────────────────────────────── -->
   <div id="menu">
     <h1>Wrong Choice</h1>
-
-    <!-- How to Play -->
     <button id="howToPlayBtn">How to Play</button>
 
-    <!-- Category Picker -->
     <label for="categorySelect">Category:</label>
     <select id="categorySelect">
       <option value="">Select a category</option>
       <option value="animals">Animals</option>
       <option value="foods">Foods</option>
       <option value="flags">Flags</option>
-      <!-- add more as desired -->
     </select>
     <div class="cat" data-cat="animals">Animals</div>
     <div class="cat" data-cat="foods">Foods</div>
     <div class="cat" data-cat="flags">Flags</div>
 
-    <!-- Difficulty Buttons -->
     <div class="levels">
       <button class="level" data-level="Basic"  disabled>Basic</button>
       <button class="level" data-level="Hard"   disabled>Hard</button>
       <button class="level" data-level="Expert" disabled>Expert</button>
     </div>
 
-    <!-- Dark Mode Toggle -->
     <button id="darkToggle">🌙</button>
 
-    <!-- Share Buttons -->
     <div class="share-buttons">
       <button id="shareXButton">Tweet</button>
       <button id="shareFacebookButton">Facebook</button>
       <button id="shareScore">Native Share</button>
     </div>
 
-    <!-- Streak Display -->
     <div id="streakBadge">🔥0</div>
   </div>
 
@@ -64,7 +58,6 @@
         • Click “No” if it doesn’t match. That’s correct—earn combo points!<br>
         Lose all three hearts or finish all questions to end the game.
       </p>
-      <p>Score more by chaining “No” answers quickly. Good luck!</p>
     </div>
   </div>
 
@@ -96,13 +89,11 @@
     <div class="modal-content">
       <h2>Game Over</h2>
       <p id="finalScoreText">Your final score: 0</p>
-      <input id="playerNameInput" type="text" placeholder="Enter your name">
+      <input id="playerNameInput" placeholder="Enter your name" />
       <button id="registerScoreButton">OK</button>
     </div>
   </div>
 
-  <!-- ────────────────────────────────────────────────────────────────────────────── -->
-  <!-- Main game script -->
-  <script src="script.js"></script>
+  <script src="script.js?v=3"></script>
 </body>
 </html>
