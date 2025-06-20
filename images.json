@@ -31,7 +31,8 @@
     { "file": "hedgehog.jpg",       "category": "Animals" },
     { "file": "cobra.jpg",       "category": "Animals" },
     { "file": "snail.jpg",       "category": "Animals" },
-
+    { "file": "golfish.jpg",       "category": "Animals" },
+    
     { "file": "guitar.jpg",         "category": "Instruments" },
     { "file": "piano.jpg",          "category": "Instruments" },
     { "file": "violin.jpg",         "category": "Instruments" },
